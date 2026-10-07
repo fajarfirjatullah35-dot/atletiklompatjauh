@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Jump Bros - Petualangan Lompat Jauh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            user-select: none;
+        }
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+        .mario-bg {
+            background: linear-gradient(to bottom, #5c94fc 0%, #80bfff 70%, #5c94fc 100%);
+        }
+        .ground {
+            background: #c84c0c;
+            background-image: 
+                linear-gradient(45deg, #e75910 25%, transparent 25%), 
+                linear-gradient(-45deg, #e75910 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #e75910 75%), 
+                linear-gradient(-45deg, transparent 75%, #e75910 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            border-top: 6px solid #00a800;
+        }
+        .sand-pit {
+            background: #e0c068;
+            border-top: 4px solid #b89030;
+        }
+        .brick {
+            background: #b84418;
+            border: 3px solid #f8d870;
+            box-shadow: inset -3px -3px 0px #00000080;
+        }
+        .question-box {
+            background: #fcb000;
+            border: 3px solid #ffffff;
+            box-shadow: 0 4px 0 #b87000;
+            animation: bounce 0.6s infinite alternate;
+        }
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-5px); }
+        }
+        .mario-jump {
+            animation: jumpAnim 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        @keyframes jumpAnim {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            30% { transform: translate(120px, -140px) rotate(-15deg); }
+            60% { transform: translate(260px, -120px) rotate(10deg); }
+            100% { transform: translate(380px, 0px) rotate(0deg); }
+        }
+        .btn-retro {
+            transition: all 0.1s ease;
+            box-shadow: 0 6px 0 #000;
+        }
+        .btn-retro:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #000;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-2 md:p-4">
+
+    <div class="w-full max-w-4xl bg-gray-900 border-4 border-yellow-400 rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[650px]">
+        
+        <!-- Header / Stats Bar -->
+        <div class="bg-black p-4 border-b-4 border-yellow-500 flex flex-wrap justify-between items-center gap-2 pixel-font text-xs md:text-sm text-yellow-300">
+            <div class="flex items-center gap-2">
+                <span class="text-red-500">MARIO</span>
+                <span id="score-text" class="text-white">000000</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-green-400">LEVEL</span>
+                <span id="level-text" class="text-white">1</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-blue-400">SOAL</span>
+                <span id="question-num-text" class="text-white">1/20</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-red-400">NYAWA:</span>
+                <div id="lives-container" class="flex gap-1 text-base">❤️ ❤️ ❤️</div>
+            </div>
+        </div>
+
+        <!-- Main Game Stage Viewport -->
+        <div class="relative h-52 md:h-64 mario-bg overflow-hidden border-b-4 border-gray-800 flex flex-col justify-end">
+            <!-- Clouds & Decoration -->
+            <div class="absolute top-4 left-10 text-white opacity-80 text-4xl">☁️</div>
+            <div class="absolute top-8 right-20 text-white opacity-80 text-5xl">☁️</div>
+            <div class="absolute top-2 left-1/2 text-white opacity-60 text-3xl">☁️</div>
+
+            <!-- Stage Progress Indicator -->
+            <div class="absolute top-3 left-4 bg-black/60 backdrop-blur px-3 py-1 rounded-full border border-white/20 text-xs font-bold text-white flex items-center gap-2">
+                <span id="level-badge" class="bg-yellow-500 text-black px-2 py-0.5 rounded text-[10px] font-black">LEVEL 1</span>
+                <span id="level-name">Teknik Dasar & Awalan</span>
+            </div>
+
+            <!-- Interactive Physics Field -->
+            <div class="relative w-full h-36 flex items-end px-6 pb-0">
+                <!-- Mario Player Character -->
+                <div id="mario" class="absolute bottom-10 left-8 z-20 text-4xl md:text-5xl transition-transform duration-300 transform scale-x-100 filter drop-shadow-lg">
+                    🏃‍♂️
+                </div>
+
+                <!-- Papan Tumpuan / Take-off Board -->
+                <div class="absolute bottom-10 left-48 w-12 h-4 bg-white border-2 border-red-600 rounded-sm shadow-md flex items-center justify-center">
+                    <div class="w-full h-1 bg-red-600"></div>
+                </div>
+
+                <!-- Bak Pasir / Sand Pit -->
+                <div class="absolute bottom-0 right-4 w-64 md:w-80 h-10 sand-pit rounded-t-md flex items-center justify-around px-2 text-xs font-black text-amber-900/40">
+                    <span>░░░</span><span>BAK PASIR</span><span>░░░</span>
+                </div>
+
+                <!-- Distance Marker Flag -->
+                <div id="flag" class="absolute bottom-10 right-8 text-3xl hidden z-10 transition-all duration-500">
+                    🚩
+                </div>
+            </div>
+
+            <!-- Ground Platform -->
+            <div class="w-full h-10 ground z-10"></div>
+        </div>
+
+        <!-- Question & Interactive Area -->
+        <div class="flex-1 bg-gray-800 p-4 md:p-6 flex flex-col justify-between relative">
+            
+            <!-- Screen 1: Start Screen -->
+            <div id="start-screen" class="flex flex-col items-center justify-center text-center my-auto py-6 space-y-6">
+                <div class="space-y-2">
+                    <h1 class="text-2xl md:text-4xl font-extrabold text-yellow-400 pixel-font tracking-wide leading-tight">
+                        SUPER JUMP BROS
+                    </h1>
+                    <p class="text-gray-300 text-sm md:text-base font-semibold">
+                        Kuis Interaktif Pembelajaran PJOK: Atletik Lompat Jauh
+                    </p>
+                </div>
+
+                <div class="bg-gray-900 border-2 border-yellow-500/50 p-4 rounded-xl text-left text-xs md:text-sm text-gray-300 max-w-md space-y-2">
+                    <div class="font-bold text-yellow-400 border-b border-gray-700 pb-1">🎮 Misi Permainan:</div>
+                    <p>• Jawab 20 soal bertingkat (Level 1 sampai Level 4).</p>
+                    <p>• Setiap jawaban benar membuat Mario melakukan lompatan sempurna!</p>
+                    <p>• Jawaban salah mengurangi nyawa Mario. Capai skor tertinggi!</p>
+                </div>
+
+                <button id="start-btn" class="btn-retro bg-green-500 hover:bg-green-400 text-black font-black text-lg md:text-xl px-8 py-4 rounded-xl border-4 border-white pixel-font cursor-pointer">
+                    MULAI GAME▶
+                </button>
+            </div>
+
+            <!-- Screen 2: Game Screen -->
+            <div id="game-screen" class="hidden flex-col h-full justify-between space-y-4">
+                <!-- Question Card -->
+                <div class="bg-gray-900 border-2 border-yellow-500/80 rounded-xl p-4 md:p-5 shadow-lg relative">
+                    <div class="flex justify-between items-center mb-2">
+                        <span id="question-category" class="text-xs font-extrabold px-2.5 py-1 rounded bg-yellow-500 text-black uppercase tracking-wider">
+                            Kategori
+                        </span>
+                        <span id="question-points" class="text-xs font-bold text-green-400 pixel-font">
+                            +100 PTS
+                        </span>
+                    </div>
+                    <h2 id="question-text" class="text-base md:text-lg font-bold text-white leading-relaxed">
+                        Teks Pertanyaan...
+                    </h2>
+                </div>
+
+                <!-- Answer Options Grid -->
+                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <!-- Options injected dynamically via JS -->
+                </div>
+
+                <!-- Feedback Overlay Box -->
+                <div id="feedback-box" class="hidden p-3 rounded-lg text-center font-bold text-sm md:text-base animate-pulse">
+                </div>
+            </div>
+
+            <!-- Screen 3: Game Over / Victory Screen -->
+            <div id="end-screen" class="hidden flex-col items-center justify-center text-center my-auto py-6 space-y-6">
+                <div id="end-title" class="text-3xl md:text-5xl font-extrabold pixel-font">
+                    GAME OVER
+                </div>
+                
+                <div class="bg-gray-900 border-2 border-yellow-500/50 p-6 rounded-2xl max-w-md w-full space-y-4">
+                    <div class="text-gray-400 text-xs uppercase tracking-widest font-bold">Hasil Akhir Petualangan</div>
+                    <div class="text-4xl font-black text-yellow-400 pixel-font" id="final-score">00000</div>
+                    
+                    <div class="grid grid-cols-2 gap-2 text-xs md:text-sm pt-2 border-t border-gray-800">
+                        <div class="text-left text-gray-400">Total Benar:</div>
+                        <div class="text-right font-bold text-green-400" id="final-correct">0 / 20</div>
+                        <div class="text-left text-gray-400">Tingkat Ketepatan:</div>
+                        <div class="text-right font-bold text-blue-400" id="final-accuracy">0%</div>
+                        <div class="text-left text-gray-400">Gelar Lompatan:</div>
+                        <div class="text-right font-bold text-yellow-300" id="final-rank">Pemula</div>
+                    </div>
+                </div>
+
+                <button id="restart-btn" class="btn-retro bg-yellow-500 hover:bg-yellow-400 text-black font-black text-base md:text-lg px-8 py-3.5 rounded-xl border-4 border-white pixel-font cursor-pointer">
+                    MAIN LAGI 🔄
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Data 20 Soal Pembelajaran Lompat Jauh (4 Multi-Level)
+        const questionsData = [
+            // LEVEL 1: Dasar & Awalan (Soal 1-5)
+            {
+                level: 1,
+                levelName: "Dasar & Awalan",
+                question: "Apa tujuan utama dari olahraga lompat jauh?",
+                options: [
+                    "Melompat setinggi-tingginya melewati mistar",
+                    "Mencapai jarak lompatan sejauh-jauhnya ke dalam bak pasir",
+                    "Melakukan gerakan indah di udara",
+                    "Berlari secepat-cepatnya tanpa melompat"
+                ],
+                answer: 1,
+                explanation: "Tujuan utama lompat jauh adalah mencapai jarak lompatan sejauh mungkin dari papan tumpuan ke bak pasir."
+            },
+            {
+                level: 1,
+                levelName: "Dasar & Awalan",
+                question: "Panjang lintasan awalan (runway) standar untuk lompat jauh adalah...",
+                options: [
+                    "10 - 15 meter",
+                    "20 - 25 meter",
+                    "30 - 45 meter",
+                    "50 - 60 meter"
+                ],
+                answer: 2,
+                explanation: "Panjang lintasan awalan standar internasional adalah minimal 40 - 45 meter."
+            },
+            {
+                level: 1,
+                levelName: "Dasar & Awalan",
+                question: "Gerakan awal yang dilakukan atlet sebelum melakukan tolakan disebut...",
+                options: ["Awalan (Approach)", "Melayang (Flying)", "Mendarat (Landing)", "Tumpuan (Take-off)"],
+                answer: 0,
+                explanation: "Awalan adalah gerakan lari percepatan menuju papan tumpuan."
+            },
+            {
+                level: 1,
+                levelName: "Dasar & Awalan",
+                question: "Saat melakukan lari awalan, kecepatan lari sebaiknya...",
+                options: [
+                    "Konstan dari awal sampai akhir",
+                    "Makin lama makin cepat (bertambah secara bertahap)",
+                    "Cepat di awal lalu melambat saat mendekati papan",
+                    "Santai saja tidak perlu terlalu cepat"
+                ],
+                answer: 1,
+                explanation: "Kecepatan awalan harus ditingkatkan secara bertahap mencapai kecepatan maksimum tepat sebelum tolakan."
+            },
+            {
+                level: 1,
+                levelName: "Dasar & Awalan",
+                question: "Posisi badan yang benar saat melakukan lari awalan adalah...",
+                options: ["Tegak lurus", "Cenderung condong ke depan", "Melengkung ke belakang", "Miring ke samping"],
+                answer: 1,
+                explanation: "Badan condong ke depan membantu membangun momentum kecepatan horizontal secara optimal."
+            },
+
+            // LEVEL 2: Tolakan & Tumpuan (Soal 6-10)
+            {
+                level: 2,
+                levelName: "Tolakan & Tumpuan",
+                question: "Kaki yang digunakan untuk melakukan tolakan pada papan tumpuan adalah...",
+                options: ["Kaki kiri saja", "Kaki kanan saja", "Kaki yang paling kuat", "Kedua kaki secara bersamaan"],
+                answer: 2,
+                explanation: "Tolakan dilakukan menggunakan satu kaki terkuat (kaki tumpu) untuk menghasilkan daya dorong maksimal."
+            },
+            {
+                level: 2,
+                levelName: "Tolakan & Tumpuan",
+                question: "Arah ayunan lengan saat melakukan tolakan pada papan tumpuan adalah...",
+                options: ["Ke belakang bawah", "Ke depan atas", "Ke samping kanan kiri", "Diputar ke belakang"],
+                answer: 1,
+                explanation: "Ayunan lengan ke depan atas membantu mengangkat titik berat badan ke udara."
+            },
+            {
+                level: 2,
+                levelName: "Tolakan & Tumpuan",
+                question: "Sudut tolakan (take-off angle) yang ideal dalam lompat jauh adalah sekitar...",
+                options: ["15 - 25 derajat", "45 - 50 derajat", "60 - 70 derajat", "80 - 90 derajat"],
+                answer: 0,
+                explanation: "Sudut tolakan ideal berkisar 18 - 24 derajat agar kombinasi kecepatan horizontal dan gaya angkat vertikal seimbang."
+            },
+            {
+                level: 2,
+                levelName: "Tolakan & Tumpuan",
+                question: "Bahan standar pembuat papan tumpuan pada lompat jauh biasanya terbuat dari...",
+                options: ["Besi padat", "Kayu tebal / bahan sintetis keras", "Karet empuk", "Plastik tipis"],
+                answer: 1,
+                explanation: "Papan tumpuan terbuat dari kayu keras atau bahan sintetis rigid agar tidak meredam gaya tolakan."
+            },
+            {
+                level: 2,
+                levelName: "Tolakan & Tumpuan",
+                question: "Apa yang terjadi jika pelompat menumpu melebihi batas papan tumpuan?",
+                options: ["Lompatan sah dan diberi bonus poin", "Lompatan dianggap diskualifikasi / Batal (Foul)", "Diberi kesempatan mengulang langsung", "Lompatan diukur dari tempat mendarat saja"],
+                answer: 1,
+                explanation: "Menyentuh atau melebihi garis batas depan papan tumpuan dinyatakan diskualifikasi/foul."
+            },
+
+            // LEVEL 3: Gaya Melayang & Pendaratan (Soal 11-15)
+            {
+                level: 3,
+                levelName: "Melayang & Pendaratan",
+                question: "Gaya lompat jauh di mana posisi badan melengkung ke belakang saat di udara disebut gaya...",
+                options: ["Gaya Jongkok (Ortodoks)", "Gaya Menggantung (Hang Style)", "Gaya Berjalan di Udara (Walking in the air)", "Gaya Flop"],
+                answer: 1,
+                explanation: "Gaya menggantung (Schnepper/Hang style) ditandai dengan posisi dada dibusungkan dan badan melengkung ke belakang."
+            },
+            {
+                level: 3,
+                levelName: "Melayang & Pendaratan",
+                question: "Sebutkan nama lain dari gaya lompat jauh 'Berjalan di Udara'!",
+                options: ["Tuck Style", "Hang Style", "Hitch Kick", "Straddle Style"],
+                answer: 2,
+                explanation: "Gaya berjalan di udara dikenal secara internasional dengan sebutan Hitch Kick."
+            },
+            {
+                level: 3,
+                levelName: "Melayang & Pendaratan",
+                question: "Saat mendarat di bak pasir, kedua kaki sebaiknya ditunjukkan ke arah...",
+                options: ["Belakang", "Bawah lurus", "Depan dengan lutut agak mengeper", "Samping kanan"],
+                answer: 2,
+                explanation: "Mendarat dengan kedua kaki lurus ke depan dan lutut mengeper mencegah cedera serta memaksimalkan jarak jangkauan."
+            },
+            {
+                level: 3,
+                levelName: "Melayang & Pendaratan",
+                question: "Saat mendarat, anggota badan tidak boleh jatuh ke arah...",
+                options: ["Depan", "Belakang", "Samping depan", "Atas"],
+                answer: 1,
+                explanation: "Jarak diukur dari bekas tumpuan terdekat di pasir ke papan tumpuan. Jika jatuh ke belakang, jarak lompatan berkurang."
+            },
+            {
+                level: 3,
+                levelName: "Melayang & Pendaratan",
+                question: "Fungsi menekuk lutut (mengeper) saat mendarat adalah untuk...",
+                options: ["Menambah jarak lompatan", "Meredam benturan dan mencegah cedera", "Membuat lompatan terlihat indah", "Agar pasir tidak berhamburan"],
+                answer: 1,
+                explanation: "Mengeper saat mendarat mengurangi gaya benturan langsung pada sendi lutut dan tulang belakang."
+            },
+
+            // LEVEL 4: Peraturan & Analisa Perhitungan (Soal 16-20)
+            {
+                level: 4,
+                levelName: "Peraturan & Analisa",
+                question: "Pengukuran hasil lompatan dilakukan dari garis bekas pendaratan...",
+                options: [
+                    "Paling depan di bak pasir",
+                    "Paling belakang / terdekat dengan papan tumpuan",
+                    "Tepat di tengah-tengah bak pasir",
+                    "Bebas sesuai keputusan juri"
+                ],
+                answer: 1,
+                explanation: "Pengukuran selalu diambil dari titik pendaratan terdekat dengan papan tumpuan (titik bekas tubuh bagian paling belakang)."
+            },
+            {
+                level: 4,
+                levelName: "Peraturan & Analisa",
+                question: "Berapa kesempatan lompatan yang biasanya diberikan kepada atlet pada babak final kejuaraan?",
+                options: ["1 kali", "2 kali", "3 - 6 kali", "10 kali"],
+                answer: 2,
+                explanation: "Dalam perlombaan resmi, atlet biasanya mendapat 3 kali lompatan kualifikasi dan 3 kali lompatan final."
+            },
+            {
+                level: 4,
+                levelName: "Peraturan & Analisa",
+                question: "Manakah dari hal berikut yang menyebabkan lompatan dinyatakan BATAL (Foul)?",
+                options: [
+                    "Mendarat dengan dua kaki bersamaan",
+                    "Menumpu tepat sebelum garis tumpuan",
+                    "Berjalan kembali melewati bak pasir ke arah papan tumpuan setelah mendarat",
+                    "Melayang dengan gaya berjalan di udara"
+                ],
+                answer: 2,
+                explanation: "Setelah mendarat, atlet wajib keluar melalui bagian depan/samping bak pasir. Berjalan kembali ke belakang melewati pendaratan membuat lompatan batal."
+            },
+            {
+                level: 4,
+                levelName: "Peraturan & Analisa",
+                question: "Lebar papan tumpuan standar dalam perlombaan atletik lompat jauh adalah...",
+                options: ["10 cm", "20 cm", "30 cm", "40 cm"],
+                answer: 1,
+                explanation: "Papan tumpuan standar memiliki panjang 1,22 meter dan lebar 20 cm."
+            },
+            {
+                level: 4,
+                levelName: "Peraturan & Analisa",
+                question: "Unsur fisik utama yang paling dominan mempengaruhi keberhasilan lompat jauh adalah...",
+                options: [
+                    "Kelentukan dan Daya Tahan",
+                    "Kecepatan (Speed) dan Daya Ledak Otot Tungkai (Power)",
+                    "Keseimbangan dan Keterampilan",
+                    "Kekuatan Otot Lengan"
+                ],
+                answer: 1,
+                explanation: "Kecepatan awalan berpadu dengan power ketangkasan otot tungkai adalah kunci utama menghasilkan lompatan jauh."
+            }
+        ];
+
+        // Web Audio Synth Helper (Efek Suara Retro)
+        const AudioFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playJump() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            },
+            playCorrect() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, this.ctx.currentTime); // C5
+                osc.frequency.setValueAtTime(659.25, this.ctx.currentTime + 0.1); // E5
+                osc.frequency.setValueAtTime(783.99, this.ctx.currentTime + 0.2); // G5
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.4);
+            },
+            playWrong() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(80, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            }
+        };
+
+        // State Game Variables
+        let currentQuestionIdx = 0;
+        let score = 0;
+        let lives = 3;
+        let correctAnswersCount = 0;
+        let isAnsweringBlocked = false;
+
+        // DOM Elements
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const endScreen = document.getElementById('end-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const scoreText = document.getElementById('score-text');
+        const levelText = document.getElementById('level-text');
+        const questionNumText = document.getElementById('question-num-text');
+        const livesContainer = document.getElementById('lives-container');
+
+        const levelBadge = document.getElementById('level-badge');
+        const levelName = document.getElementById('level-name');
+        const questionCategory = document.getElementById('question-category');
+        const questionPoints = document.getElementById('question-points');
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const feedbackBox = document.getElementById('feedback-box');
+
+        const marioEl = document.getElementById('mario');
+        const flagEl = document.getElementById('flag');
+
+        // Event Listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+
+        function startGame() {
+            currentQuestionIdx = 0;
+            score = 0;
+            lives = 3;
+            correctAnswersCount = 0;
+            isAnsweringBlocked = false;
+
+            startScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            gameScreen.classList.add('flex');
+
+            updateHeaderStats();
+            loadQuestion();
+        }
+
+        function updateHeaderStats() {
+            scoreText.innerText = String(score).padStart(6, '0');
+            questionNumText.innerText = `${currentQuestionIdx + 1}/${questionsData.length}`;
+            
+            // Lives render
+            let hearts = '';
+            for (let i = 0; i < lives; i++) hearts += '❤️ ';
+            livesContainer.innerText = hearts || '💀';
+        }
+
+        function loadQuestion() {
+            isAnsweringBlocked = false;
+            feedbackBox.classList.add('hidden');
+            
+            const q = questionsData[currentQuestionIdx];
+
+            // Update Level Header Info
+            levelBadge.innerText = `LEVEL ${q.level}`;
+            levelName.innerText = q.levelName;
+            levelText.innerText = q.level;
+            questionCategory.innerText = `LEVEL ${q.level}: ${q.levelName}`;
+            questionPoints.innerText = `+${q.level * 100} PTS`;
+            questionText.innerText = q.question;
+
+            // Render Option Buttons
+            optionsContainer.innerHTML = '';
+            q.options.forEach((optText, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-retro bg-gray-700 hover:bg-gray-600 border-2 border-gray-400 text-white font-semibold text-left p-3 md:p-4 rounded-xl text-xs md:text-sm transition flex items-start gap-3';
+                
+                const prefix = document.createElement('span');
+                prefix.className = 'bg-yellow-500 text-black px-2 py-0.5 rounded font-black text-xs shrink-0';
+                prefix.innerText = String.fromCharCode(65 + index); // A, B, C, D
+
+                const textSpan = document.createElement('span');
+                textSpan.innerText = optText;
+
+                btn.appendChild(prefix);
+                btn.appendChild(textSpan);
+                btn.onclick = () => handleAnswer(index);
+
+                optionsContainer.appendChild(btn);
+            });
+
+            // Reset Mario Animation
+            marioEl.classList.remove('mario-jump');
+            flagEl.classList.add('hidden');
+            updateHeaderStats();
+        }
+
+        function handleAnswer(selectedIndex) {
+            if (isAnsweringBlocked) return;
+            isAnsweringBlocked = true;
+
+            const q = questionsData[currentQuestionIdx];
+            const optionButtons = optionsContainer.children;
+
+            if (selectedIndex === q.answer) {
+                // Jawaban BENAR
+                AudioFX.playCorrect();
+                score += q.level * 100;
+                correctAnswersCount++;
+
+                optionButtons[selectedIndex].classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                optionButtons[selectedIndex].classList.add('bg-green-600', 'border-green-300');
+
+                showFeedback(true, `BENAR! 🎉 ${q.explanation}`);
+
+                // Trigger Mario Jump Animation
+                setTimeout(() => {
+                    AudioFX.playJump();
+                    marioEl.classList.add('mario-jump');
+                    setTimeout(() => {
+                        flagEl.classList.remove('hidden');
+                    }, 800);
+                }, 200);
+
+            } else {
+                // Jawaban SALAH
+                AudioFX.playWrong();
+                lives--;
+
+                optionButtons[selectedIndex].classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                optionButtons[selectedIndex].classList.add('bg-red-600', 'border-red-300');
+                
+                // Highlight mana jawaban yang benar
+                optionButtons[q.answer].classList.remove('bg-gray-700');
+                optionButtons[q.answer].classList.add('bg-green-600', 'border-green-300');
+
+                showFeedback(false, `SALAH! ❌ Jawaban tepat: (${String.fromCharCode(65 + q.answer)}). ${q.explanation}`);
+            }
+
+            updateHeaderStats();
+
+            // Next Question or End Game
+            setTimeout(() => {
+                if (lives <= 0) {
+                    endGame(false);
+                } else {
+                    currentQuestionIdx++;
+                    if (currentQuestionIdx < questionsData.length) {
+                        loadQuestion();
+                    } else {
+                        endGame(true);
+                    }
+                }
+            }, 3200);
+        }
+
+        function showFeedback(isCorrect, msg) {
+            feedbackBox.classList.remove('hidden', 'bg-green-900/80', 'bg-red-900/80', 'text-green-200', 'text-red-200', 'border-green-500', 'border-red-500');
+            if (isCorrect) {
+                feedbackBox.classList.add('bg-green-900/80', 'text-green-200', 'border', 'border-green-500');
+            } else {
+                feedbackBox.classList.add('bg-red-900/80', 'text-red-200', 'border', 'border-red-500');
+            }
+            feedbackBox.innerText = msg;
+        }
+
+        function endGame(isWin) {
+            gameScreen.classList.add('hidden');
+            gameScreen.classList.remove('flex');
+            endScreen.classList.remove('hidden');
+            endScreen.classList.add('flex');
+
+            const endTitle = document.getElementById('end-title');
+            const finalScore = document.getElementById('final-score');
+            const finalCorrect = document.getElementById('final-correct');
+            const finalAccuracy = document.getElementById('final-accuracy');
+            const finalRank = document.getElementById('final-rank');
+
+            finalScore.innerText = String(score).padStart(6, '0');
+            finalCorrect.innerText = `${correctAnswersCount} / ${questionsData.length}`;
+            
+            const accuracy = Math.round((correctAnswersCount / questionsData.length) * 100);
+            finalAccuracy.innerText = `${accuracy}%`;
+
+            if (isWin || lives > 0) {
+                endTitle.innerText = "STAGE CLEAR! 🏆";
+                endTitle.className = "text-2xl md:text-4xl font-extrabold pixel-font text-green-400";
+            } else {
+                endTitle.innerText = "GAME OVER 💀";
+                endTitle.className = "text-2xl md:text-4xl font-extrabold pixel-font text-red-500";
+            }
+
+            // Determine Rank Title
+            if (accuracy >= 90) {
+                finalRank.innerText = "🥇 Atlet Lompat Atletik Dunia";
+            } else if (accuracy >= 75) {
+                finalRank.innerText = "🥈 Pelompat Profesional";
+            } else if (accuracy >= 50) {
+                finalRank.innerText = "🥉 Atlet Daerah";
+            } else {
+                finalRank.innerText = "👟 Pelompat Pemula";
+            }
+        }
+    </script>
+</body>
+</html>
+```eof
+
+### Fitur-Fitur Utama Game Ini:
+1. **Atmosfer Retro Mario Bros:** Dilengkapi dengan *font pixel*, warna khas panggung Mario, latar bak pasir atletik, animasi rintangan, dan efek suara sintetis retro (Web Audio API) tanpa bergantung pada file media eksternal.
+2. **20 Soal Pembelajaran Lompat Jauh Bertingkat (Multi-Level):**
+   - **Level 1 (Soal 1–5):** Konsep Dasar & Teknik Awalan (*Approach*).
+   - **Level 2 (Soal 6–10):** Teknik Tolakan/Tumpuan (*Take-off*).
+   - **Level 3 (Soal 11–15):** Gaya Melayang (*Flying*) & Pendaratan (*Landing*).
+   - **Level 4 (Soal 16–20):** Peraturan Perlombaan & Analisa Fisika Lompatan.
+3. **Interaktif & Responsif:** Setiap kali siswa/pemain menjawab dengan benar, Mario akan melompat dari papan tumpuan menuju bak pasir dan mengibarkan bendera kemenangan.
+4. **Sistem Skor & Nyawa:** Pemain diberi 3 nyawa. Setiap level memberikan akumulasi poin yang semakin tinggi (+100 poin hingga +400 poin per soal).
+5. **Penjelasan Edukatif (Feedback Langsung):** Setiap soal menyertakan umpan balik berupa penjelasan ringkas agar siswa dapat langsung belajar dari kesalahan.
